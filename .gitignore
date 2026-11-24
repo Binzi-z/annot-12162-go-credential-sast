@@ -14,3 +14,8 @@ recordings/
 *.jsonl
 *.mp4
 *.webm
+.credscan-cache/
+*.sarif
+fixtures/demo-go/
+fixtures/dataset/
+fixtures/perf-repo/

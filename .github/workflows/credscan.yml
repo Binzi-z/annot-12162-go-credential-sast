@@ -1,0 +1,44 @@
+name: credscan-gate
+
+# Blocks merges on any un-suppressed 'real' hardcoded credential. Example and
+# placeholder findings never block; fixture-context suppressions are recorded
+# inside the SARIF output rather than dropped.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  credential-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install scanner
+        run: pip install -r requirements.txt
+
+      - name: Full scan (SARIF artifact)
+        run: python -m credscan scan . --sarif credscan.sarif
+
+      - name: Incremental scan on the PR diff
+        if: github.event_name == 'pull_request'
+        run: python -m credscan scan . --incremental --base origin/${{ github.base_ref }} --sarif credscan-incremental.sarif
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: credscan.sarif
+        # Upload must not mask a blocking exit code from the scan step.
+        continue-on-error: true
+
+      - name: Evaluation gate (recall >= 85%, FPR <= 15%)
+        run: |
+          python eval/builder.py
+          python eval/test_units.py
+          python eval/evaluate.py
